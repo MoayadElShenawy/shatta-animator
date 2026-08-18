@@ -38,7 +38,7 @@ export function Sprite({
   return (
     <div
       className={`motion-${motion} ${className}`}
-      style={{ width: size, height: size, willChange: "transform" }}
+      style={{ width: size, height: size, aspectRatio: "1 / 1", willChange: "transform" }}
     >
       <img
         key={src}
@@ -49,10 +49,15 @@ export function Sprite({
         width={size}
         height={size}
         style={{
-          width: "100%",
-          height: "100%",
+          display: "block",
+          width: size,
+          height: size,
+          // Frames are square; contain + bottom anchoring keeps proportions
+          // uniform and the feet on the same ground line across every frame.
           objectFit: "contain",
+          objectPosition: "center bottom",
           transform: facing === -1 ? "scaleX(-1)" : undefined,
+          transformOrigin: "50% 100%",
           filter: "drop-shadow(0 10px 14px rgba(0,0,0,0.28))",
           userSelect: "none",
         }}
