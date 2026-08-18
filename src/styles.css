@@ -142,3 +142,175 @@
     color: var(--color-foreground);
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Shatta theme — chaotic red cat, dark hoodie, off-white paper.
+ * Overrides the template tokens above.
+ * ------------------------------------------------------------------ */
+
+:root,
+.dark {
+  --radius: 1.25rem;
+
+  /* near-black dominant surfaces */
+  --background: oklch(0.155 0.012 25);
+  --foreground: oklch(0.965 0.008 60);
+  --card: oklch(0.205 0.016 24);
+  --card-foreground: oklch(0.965 0.008 60);
+  --popover: oklch(0.205 0.016 24);
+  --popover-foreground: oklch(0.965 0.008 60);
+
+  /* Shatta red */
+  --primary: oklch(0.605 0.225 26);
+  --primary-foreground: oklch(0.985 0.005 60);
+  --secondary: oklch(0.245 0.02 24);
+  --secondary-foreground: oklch(0.965 0.008 60);
+
+  --muted: oklch(0.255 0.018 24);
+  --muted-foreground: oklch(0.72 0.02 40);
+  --accent: oklch(0.42 0.16 25);
+  --accent-foreground: oklch(0.975 0.006 60);
+
+  --destructive: oklch(0.62 0.22 25);
+  --destructive-foreground: oklch(0.985 0.005 60);
+
+  --border: oklch(0.62 0.2 26 / 22%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.605 0.225 26);
+
+  --ink: oklch(0.11 0.01 25);
+  --shatta-red-deep: oklch(0.42 0.17 25);
+  --shatta-glow: oklch(0.62 0.22 28 / 0.45);
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-red-deep: var(--shatta-red-deep);
+  --font-display: "Baloo 2", ui-rounded, system-ui, sans-serif;
+  --font-wordmark: "Luckiest Guy", "Baloo 2", ui-rounded, system-ui, sans-serif;
+  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ----------------------------- brand lettering ---------------------------- */
+
+@utility wordmark {
+  font-family: var(--font-wordmark);
+  letter-spacing: 0.02em;
+  color: var(--primary);
+  -webkit-text-stroke: 2px var(--ink);
+  paint-order: stroke fill;
+  text-shadow:
+    0 3px 0 var(--shatta-red-deep),
+    0 6px 0 var(--ink),
+    0 14px 28px var(--shatta-glow);
+  transform: rotate(-2deg);
+  display: inline-block;
+}
+
+@utility wordmark-sm {
+  font-family: var(--font-wordmark);
+  letter-spacing: 0.04em;
+  color: var(--primary);
+  text-shadow: 0 2px 0 var(--ink);
+  transform: rotate(-2deg);
+  display: inline-block;
+}
+
+@utility panel-dark {
+  background:
+    linear-gradient(160deg, color-mix(in oklab, var(--card) 92%, transparent), var(--background));
+  border: 2px solid color-mix(in oklab, var(--primary) 22%, transparent);
+  box-shadow: 0 24px 60px -34px var(--shatta-glow);
+  &:hover {
+    border-color: color-mix(in oklab, var(--primary) 55%, transparent);
+  }
+}
+
+@utility sticker {
+  display: inline-block;
+  border: 2px solid color-mix(in oklab, var(--primary) 60%, transparent);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+}
+
+@utility scribble-underline {
+  background-image: linear-gradient(var(--primary), var(--primary));
+  background-repeat: no-repeat;
+  background-size: 0% 3px;
+  background-position: 0 100%;
+  transition: background-size 0.25s ease;
+  &:hover {
+    background-size: 100% 3px;
+  }
+}
+
+/* ----------------------------- companion motion ---------------------------- */
+
+@keyframes shatta-breathe {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50% { transform: scale(1.025, 0.978) translateY(2px); }
+}
+@keyframes shatta-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes shatta-hop {
+  0%, 100% { transform: translateY(0) scale(1); }
+  25% { transform: translateY(-16px) scale(1.03, 0.97); }
+  55% { transform: translateY(0) scale(0.96, 1.04); }
+  75% { transform: translateY(-6px) scale(1); }
+}
+@keyframes shatta-float {
+  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+  50% { transform: translateY(-8px) rotate(1.5deg); }
+}
+@keyframes shatta-wiggle {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+@keyframes shatta-walk {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-4px) rotate(1deg); }
+}
+@keyframes shatta-talk {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02, 0.985); }
+}
+@keyframes shatta-pop {
+  0% { opacity: 0; transform: translateY(6px) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.motion-breathe { animation: shatta-breathe 3.6s ease-in-out infinite; }
+.motion-bob { animation: shatta-bob 2.4s ease-in-out infinite; }
+.motion-hop { animation: shatta-hop 0.7s ease-out 2; }
+.motion-float { animation: shatta-float 3s ease-in-out infinite; }
+.motion-wiggle { animation: shatta-wiggle 0.45s ease-in-out infinite; }
+.motion-walk { animation: shatta-walk 0.42s ease-in-out infinite; }
+.motion-talk { animation: shatta-talk 0.32s ease-in-out infinite; }
+.motion-none { animation: none; }
+.animate-pop { animation: shatta-pop 0.22s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-breathe, .motion-bob, .motion-hop, .motion-float,
+  .motion-wiggle, .motion-walk, .motion-talk { animation: none !important; }
+}
+
+/* ------------------------------ decorative bits ---------------------------- */
+
+@keyframes shatta-twinkle {
+  0%, 100% { opacity: 0.35; transform: scale(0.85) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.15) rotate(12deg); }
+}
+@keyframes shatta-drift {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-10px) rotate(4deg); }
+}
+
+.deco-twinkle { animation: shatta-twinkle 3.2s ease-in-out infinite; }
+.deco-drift { animation: shatta-drift 6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .deco-twinkle, .deco-drift { animation: none !important; }
+}
