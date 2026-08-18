@@ -126,6 +126,44 @@ export function Shatta({
     };
   }, [facing]);
 
+  /* ------------------------------ locomotion ----------------------------- */
+
+  // While the walk cycle plays, the entity position actually travels. Speed is
+  // tuned to the stride: 5 frames x 130ms = 650ms per cycle, ~52px of ground
+  // covered per cycle, so the feet read as planted instead of sliding.
+  const WALK_PX_PER_SEC = 80;
+
+  useEffect(() => {
+    if (mood !== "walking" || dragging.current || settings.reduceMotion) return;
+    let raf = 0;
+    let last = performance.now();
+    let dir: 1 | -1 = Math.random() < 0.5 ? -1 : 1;
+    setFacing(dir);
+
+    const step = (now: number) => {
+      const dt = Math.min(now - last, 64) / 1000;
+      last = now;
+      setPos((p) => {
+        if (!p) return p;
+        const max = Math.max(0, window.innerWidth - SIZE);
+        let x = p.x + dir * WALK_PX_PER_SEC * dt;
+        if (x <= 0) {
+          x = 0;
+          dir = 1;
+          setFacing(1);
+        } else if (x >= max) {
+          x = max;
+          dir = -1;
+          setFacing(-1);
+        }
+        return { x, y: p.y };
+      });
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [mood, settings.reduceMotion]);
+
   /* -------------------------- desktop click-through ---------------------- */
 
   const setInteractive = useCallback((value: boolean) => {
