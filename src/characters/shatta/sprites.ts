@@ -30,26 +30,36 @@ import walk3 from "@/assets/shatta/walk-3.png";
 import walk4 from "@/assets/shatta/walk-4.png";
 import walk5 from "@/assets/shatta/walk-5.png";
 
-export type SpriteEntry = { frames: readonly string[]; frameMs: number };
+/**
+ * `scale` is a *uniform* display correction, not a stylistic choice.
+ *
+ * Each frame was padded to the shared 768x768 canvas independently, so the
+ * drawing itself ended up at a slightly different scale per frame (poses with
+ * spread paws/tail were fit tighter). Rendering every frame at the same box
+ * size therefore made the body read as bigger/smaller — i.e. subtly squashed —
+ * between states. These factors are measured per frame against `idle` and
+ * restore one consistent character size. Aspect ratio is never touched.
+ */
+export type SpriteEntry = { frames: readonly string[]; frameMs: number; scale?: number };
 
 export const SHATTA_SPRITES: Record<PetState, SpriteEntry> = {
-  idle: { frames: [idle], frameMs: 0 },
-  blink: { frames: [blink], frameMs: 0 },
-  curious: { frames: [curious], frameMs: 0 },
-  happy: { frames: [happy], frameMs: 0 },
-  silly: { frames: [silly], frameMs: 0 },
-  annoyed: { frames: [annoyed], frameMs: 0 },
-  surprised: { frames: [surprised], frameMs: 0 },
-  mischievous: { frames: [mischievous], frameMs: 0 },
-  thinking: { frames: [thinking], frameMs: 0 },
-  speaking: { frames: [speaking, idle], frameMs: 220 },
-  sleepy: { frames: [sleepy], frameMs: 0 },
-  sleeping: { frames: [sleeping], frameMs: 0 },
-  walking: { frames: [walk1, walk2, walk3, walk4, walk5], frameMs: 130 },
-  dragging: { frames: [drag], frameMs: 0 },
-  celebrating: { frames: [celebrate], frameMs: 0 },
-  stretching: { frames: [stretch], frameMs: 0 },
-  grooming: { frames: [grooming], frameMs: 0 },
+  idle: { frames: [idle], frameMs: 0, scale: 1 },
+  blink: { frames: [blink], frameMs: 0, scale: 0.999 },
+  curious: { frames: [curious], frameMs: 0, scale: 1.006 },
+  happy: { frames: [happy], frameMs: 0, scale: 0.995 },
+  silly: { frames: [silly], frameMs: 0, scale: 1.034 },
+  annoyed: { frames: [annoyed], frameMs: 0, scale: 1.033 },
+  surprised: { frames: [surprised], frameMs: 0, scale: 0.906 },
+  mischievous: { frames: [mischievous], frameMs: 0, scale: 1.009 },
+  thinking: { frames: [thinking], frameMs: 0, scale: 1.031 },
+  speaking: { frames: [speaking, idle], frameMs: 220, scale: 0.999 },
+  sleepy: { frames: [sleepy], frameMs: 0, scale: 1.064 },
+  sleeping: { frames: [sleeping], frameMs: 0, scale: 0.976 },
+  walking: { frames: [walk1, walk2, walk3, walk4, walk5], frameMs: 130, scale: 0.943 },
+  dragging: { frames: [drag], frameMs: 0, scale: 0.962 },
+  celebrating: { frames: [celebrate], frameMs: 0, scale: 1.061 },
+  stretching: { frames: [stretch], frameMs: 0, scale: 0.98 },
+  grooming: { frames: [grooming], frameMs: 0, scale: 0.998 },
 };
 
 /** Every frame, for preloading. */
