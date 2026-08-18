@@ -1,0 +1,266 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { Sprite } from "@/components/pet/Sprite";
+import { SpeechBubble } from "@/components/pet/SpeechBubble";
+import { PetMenu } from "@/components/pet/PetMenu";
+import { QuickChat } from "@/components/pet/QuickChat";
+import { SettingsPanel } from "@/components/pet/SettingsPanel";
+
+import { usePetSettings } from "@/hooks/usePetSettings";
+import { usePetLife } from "@/pet/usePetState";
+import { useShattaChat } from "@/hooks/useShattaChat";
+import { useVoiceInput } from "@/hooks/useVoiceInput";
+import { useDevEvents } from "@/hooks/useDevEvents";
+import { setMood } from "@/hooks/usePetMood";
+import { playSound } from "@/characters/shatta/sounds";
+import { speak, stopSpeaking } from "@/lib/voice-output";
+
+/**
+ * The companion container.
+ *
+ * Owns placement, pointer interactions (click / double-click / drag / ignore),
+ * and wires the life loop, chat, voice and settings together. It renders the
+ * character through the character-agnostic <Sprite /> contract, so swapping in
+ * the final artwork only means replacing the files behind the sprite sheet.
+ */
+
+const SIZE = 128;
+const BUBBLE_MS = 4200;
+
+export function Shatta({
+  variant = "page",
+  initial = { x: 0.5, y: 0.7 },
+}: {
+  /** "overlay" = transparent desktop window, "page" = inside the website. */
+  variant?: "overlay" | "page";
+  /** Starting position as a fraction of the viewport. */
+  initial?: { x: number; y: number };
+}) {
+  const { settings, update, reset, hydrated } = usePetSettings();
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [facing, setFacing] = useState<1 | -1>(1);
+  const [bubble, setBubble] = useState<string | null>(null);
+  const [panel, setPanel] = useState<"none" | "menu" | "chat" | "settings">("none");
+  const dragging = useRef(false);
+  const moved = useRef(false);
+  const offset = useRef({ x: 0, y: 0 });
+  const bubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* ------------------------------- speaking ------------------------------ */
+
+  const say = useCallback(
+    (text: string) => {
+      if (!text) return;
+      setBubble(text);
+      if (bubbleTimer.current) clearTimeout(bubbleTimer.current);
+      bubbleTimer.current = setTimeout(() => setBubble(null), BUBBLE_MS);
+    },
+    [],
+  );
+
+  const maybeSay = useCallback(
+    (text: string) => {
+      if (settings.bubbles) say(text);
+    },
+    [say, settings.bubbles],
+  );
+
+  /* ------------------------------ engine hooks --------------------------- */
+
+  const { mood, touch } = usePetLife({
+    enabled: hydrated,
+    idleAnimations: settings.idleAnimations,
+    sounds: settings.sounds,
+    onSay: maybeSay,
+  });
+
+  const chat = useShattaChat({
+    onAnswer: (text) => {
+      maybeSay(text.length > 160 ? `${text.slice(0, 157)}...` : text);
+      if (settings.voiceOutput) void speak(text, settings.volume);
+    },
+  });
+
+  const mic = useVoiceInput((text) => chat.send(text));
+  const { available: devAvailable } = useDevEvents(settings.devContext, maybeSay);
+
+  useEffect(() => () => stopSpeaking(), []);
+  useEffect(() => {
+    if (!settings.voiceOutput) stopSpeaking();
+  }, [settings.voiceOutput]);
+
+  /* ------------------------------- placement ----------------------------- */
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setPos({
+      x: window.innerWidth * initial.x - SIZE / 2,
+      y: window.innerHeight * initial.y - SIZE / 2,
+    });
+    // position is seeded once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!dragging.current) return;
+      moved.current = true;
+      const x = Math.min(Math.max(0, e.clientX - offset.current.x), window.innerWidth - SIZE);
+      const y = Math.min(Math.max(0, e.clientY - offset.current.y), window.innerHeight - SIZE);
+      setPos((p) => {
+        if (p) setFacing(x > p.x ? 1 : x < p.x ? -1 : facing);
+        return { x, y };
+      });
+    };
+    const onUp = () => {
+      if (!dragging.current) return;
+      dragging.current = false;
+      setMood(moved.current ? "surprised" : "idle", true);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [facing]);
+
+  /* -------------------------- desktop click-through ---------------------- */
+
+  const setInteractive = useCallback((value: boolean) => {
+    if (variant !== "overlay") return;
+    window.shatta?.setInteractive?.(value);
+    // variant never changes for a mounted instance
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variant]);
+
+  useEffect(() => {
+    if (variant !== "overlay") return;
+    // Panels are interactive surfaces — keep the window clickable while open.
+    if (panel !== "none") window.shatta?.setInteractive?.(true);
+  }, [panel, variant]);
+
+  /* ------------------------------ interactions --------------------------- */
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    touch();
+    dragging.current = true;
+    moved.current = false;
+    offset.current = { x: e.clientX - (pos?.x ?? 0), y: e.clientY - (pos?.y ?? 0) };
+    setMood("dragging", true);
+  };
+
+  const onClick = () => {
+    if (moved.current) return;
+    touch();
+    if (settings.sounds) playSound("click");
+    if (clickTimer.current) return; // second click handled by onDoubleClick
+    clickTimer.current = setTimeout(() => {
+      clickTimer.current = null;
+      setMood("happy", true);
+    }, 220);
+  };
+
+  const onDoubleClick = () => {
+    if (clickTimer.current) {
+      clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+    }
+    touch();
+    setMood("silly", true);
+    setPanel((p) => (p === "none" ? "menu" : "none"));
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onClick();
+    }
+    if (e.key === "m") setPanel((p) => (p === "menu" ? "none" : "menu"));
+  };
+
+  const closePanel = () => setPanel("none");
+
+  if (!pos) return null;
+
+  const bubbleSide = pos.x > (typeof window !== "undefined" ? window.innerWidth / 2 : 600) ? "left" : "right";
+
+  return (
+    <div
+      className="pointer-events-none fixed inset-0 z-50"
+      style={variant === "overlay" ? { background: "transparent" } : undefined}
+    >
+      <div
+        className="pointer-events-auto absolute flex flex-col items-center gap-2"
+        style={{ left: pos.x, top: pos.y }}
+        onPointerEnter={() => setInteractive(true)}
+        onPointerLeave={() => panel === "none" && setInteractive(false)}
+      >
+        {bubble && settings.bubbles ? (
+          <div className="max-w-[16rem]">
+            <SpeechBubble text={bubble} side={bubbleSide} />
+          </div>
+        ) : null}
+
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Shatta, your desktop cat. Click to poke, double-click for the menu, drag to move."
+          className="cursor-grab select-none active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+          onPointerDown={onPointerDown}
+          onClick={onClick}
+          onDoubleClick={onDoubleClick}
+          onKeyDown={onKeyDown}
+          onMouseEnter={() => settings.sounds && playSound("hover")}
+        >
+          <Sprite state={mood} size={SIZE} facing={facing} reduceMotion={settings.reduceMotion} />
+        </div>
+
+        {panel === "menu" ? (
+          <PetMenu
+            soundsOn={settings.sounds}
+            listening={mic.status === "recording"}
+            onChat={() => setPanel("chat")}
+            onVoice={() => {
+              if (!settings.voiceInput || !mic.supported) return;
+              setPanel("chat");
+              void mic.start();
+            }}
+            onToggleSound={() => update({ sounds: !settings.sounds })}
+            onSettings={() => setPanel("settings")}
+            onClose={closePanel}
+          />
+        ) : null}
+
+        {panel === "chat" && settings.aiChat ? (
+          <QuickChat
+            messages={chat.messages}
+            status={chat.status}
+            error={chat.error}
+            onSend={chat.send}
+            onClear={chat.clear}
+            onClose={closePanel}
+            mic={{
+              status: mic.status,
+              supported: mic.supported && settings.voiceInput,
+              error: mic.error,
+              start: () => void mic.start(),
+              stop: mic.stop,
+            }}
+          />
+        ) : null}
+
+        {panel === "settings" ? (
+          <SettingsPanel
+            settings={settings}
+            onChange={update}
+            onReset={reset}
+            onClose={closePanel}
+            devAvailable={devAvailable}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
