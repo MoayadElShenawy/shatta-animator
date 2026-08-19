@@ -136,7 +136,7 @@ export function Sprite({
 
   return (
     <div
-      className={`motion-${motion} ${shift} ${className}`}
+      className={`motion-${motion} ${className}`}
       style={{
         width: size,
         height: size,
@@ -151,6 +151,7 @@ export function Sprite({
           : null),
       }}
     >
+      <div className={shift} style={{ position: "relative", width: "100%", height: "100%" }}>
       {outgoing ? (
         <img
           key={`out-${outgoing.src}`}
@@ -175,6 +176,7 @@ export function Sprite({
         height={drawn}
         style={imgStyle({ src, drawn, facing })}
       />
+      </div>
     </div>
   );
 }
