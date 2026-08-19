@@ -87,6 +87,7 @@ export function Sprite({
   const lastLayer = useRef<Layer | null>(null);
   const [outgoing, setOutgoing] = useState<Layer | null>(null);
   const [shift, setShift] = useState("");
+  const [from, setFrom] = useState<PetState | null>(null);
 
   useEffect(() => {
     const from = prevState.current;
@@ -96,6 +97,7 @@ export function Sprite({
     const previous = lastLayer.current;
     const kind = transitionClass(from, state);
     setShift(kind);
+    setFrom(from);
     if (previous) setOutgoing(previous);
 
     const fade = from === "walking" ? WALK_OUT_MS : FADE_MS;
@@ -158,11 +160,13 @@ export function Sprite({
           draggable={false}
           width={outgoing.drawn}
           height={outgoing.drawn}
-          style={{ ...imgStyle(outgoing), opacity: 0, transition: `opacity ${FADE_MS}ms linear` }}
+          className={from === "walking" ? "layer-fade-out-slow" : "layer-fade-out"}
+          style={imgStyle(outgoing)}
         />
       ) : null}
       <img
         key={src}
+        className={shift ? "layer-fade-in" : undefined}
         src={src}
         alt=""
         aria-hidden="true"

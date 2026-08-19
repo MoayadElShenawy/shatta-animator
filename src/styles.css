@@ -249,7 +249,8 @@
 
 @keyframes shatta-breathe {
   0%, 100% { transform: scale(1) translateY(0); }
-  50% { transform: scale(1.02) translateY(2px); }
+  45% { transform: scale(1.012) translateY(1px); }
+  70% { transform: scale(1.006) translateY(0.5px); }
 }
 @keyframes shatta-bob {
   0%, 100% { transform: translateY(0); }
@@ -295,6 +296,48 @@
   transform-origin: 50% 100%;
 }
 .animate-pop { animation: shatta-pop 0.22s ease-out both; }
+
+/* ------------------------- phase 2: state continuity ----------------------- */
+/* All transition motion is uniform (translate / uniform scale) with the bottom
+   edge anchored, so the character never squashes and stays grounded. */
+
+@keyframes shatta-shift-walk-in {
+  0% { transform: translateY(0) scale(1); }
+  45% { transform: translateY(1px) scale(0.994); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes shatta-shift-walk-out {
+  0% { transform: translateY(-2px) scale(1.004); }
+  55% { transform: translateY(1px) scale(0.996); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes shatta-shift-settle {
+  0% { transform: translateY(1px) scale(0.99); }
+  60% { transform: translateY(0) scale(1.004); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes shatta-shift-wake {
+  0% { transform: translateY(1px) scale(0.988); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes shatta-layer-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes shatta-layer-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.shift-walk-in { animation: shatta-shift-walk-in 0.18s ease-out, var(--shatta-motion, none); }
+.shift-walk-out { animation: shatta-shift-walk-out 0.22s ease-out, var(--shatta-motion, none); }
+.shift-settle { animation: shatta-shift-settle 0.16s ease-out, var(--shatta-motion, none); }
+.shift-settle-slow { animation: shatta-shift-settle 0.25s ease-out, var(--shatta-motion, none); }
+.shift-wake { animation: shatta-shift-wake 0.16s ease-out, var(--shatta-motion, none); }
+
+.layer-fade-out { animation: shatta-layer-out 0.16s linear both; }
+.layer-fade-out-slow { animation: shatta-layer-out 0.2s linear both; }
+.layer-fade-in { animation: shatta-layer-in 0.16s linear both; }
 
 @media (prefers-reduced-motion: reduce) {
   .motion-breathe, .motion-bob, .motion-hop, .motion-float,
