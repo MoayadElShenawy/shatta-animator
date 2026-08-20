@@ -1,7 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { shatta } from "@/characters/shatta/personality";
+import { isMostlyArabic, toSpeakable } from "@/lib/speech-text";
 
-/** Text-to-speech so Shatta can read an answer out loud. Only runs when the user enables it. */
+/**
+ * Text-to-speech so Shatta can read an answer out loud. Only runs when the user
+ * enables voice output.
+ *
+ * The text is normalised into speakable prose first (no markdown, no emoji, no
+ * code) and the voice direction is picked per language so Egyptian Arabic keeps
+ * its Cairene rhythm while English stays natural.
+ */
 export const Route = createFileRoute("/api/speak")({
   server: {
     handlers: {
@@ -12,8 +20,14 @@ export const Route = createFileRoute("/api/speak")({
         }
 
         const body = (await request.json().catch(() => null)) as { text?: unknown } | null;
-        const text = typeof body?.text === "string" ? body.text.trim().slice(0, 2000) : "";
+        const raw = typeof body?.text === "string" ? body.text : "";
+        const text = toSpeakable(raw).slice(0, 2000);
         if (!text) return Response.json({ error: "Nothing to say." }, { status: 400 });
+
+        const arabic = isMostlyArabic(text);
+        const instructions = arabic
+          ? shatta.voice.arabicInstructions
+          : shatta.voice.instructions;
 
         const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
           method: "POST",
@@ -24,10 +38,12 @@ export const Route = createFileRoute("/api/speak")({
           },
           body: JSON.stringify({
             model: "openai/gpt-4o-mini-tts",
-            voice: "shimmer",
+            voice: shatta.voice.name,
             input: text,
             response_format: "mp3",
-            instructions: shatta.voice.instructions,
+            // Slightly under natural for Arabic: clarity beats speed there.
+            speed: arabic ? Math.max(0.9, shatta.voice.speed - 0.05) : shatta.voice.speed,
+            instructions,
           }),
         }).catch(() => null);
 
