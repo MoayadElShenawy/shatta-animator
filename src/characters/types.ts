@@ -80,7 +80,20 @@ export type CharacterDefinition = {
   states: Record<PetState, StateConfig>;
   systemPrompt: string;
   /** Voice-output tuning for the TTS route. */
-  voice: { instructions: string; rate: number; pitch: number };
+  voice: {
+    /** Voice-direction prompt used for Latin-script (English) speech. */
+    instructions: string;
+    /** Voice-direction prompt used when the line is Egyptian Arabic. */
+    arabicInstructions: string;
+    /** TTS voice id. */
+    name: string;
+    /** Speaking speed passed to the TTS model (1 = natural). */
+    speed: number;
+    /** Playback rate for the browser fallback voice. */
+    rate: number;
+    /** Pitch for the browser fallback voice. */
+    pitch: number;
+  };
 };
 
 /** Can `next` take over from `current`? */
