@@ -5,6 +5,7 @@ import { SpeechBubble } from "@/components/pet/SpeechBubble";
 import { PetMenu } from "@/components/pet/PetMenu";
 import { QuickChat } from "@/components/pet/QuickChat";
 import { SettingsPanel } from "@/components/pet/SettingsPanel";
+import { useSmartPlacement } from "@/components/pet/useSmartPlacement";
 
 import { usePetSettings } from "@/hooks/usePetSettings";
 import { usePetLife } from "@/pet/usePetState";
