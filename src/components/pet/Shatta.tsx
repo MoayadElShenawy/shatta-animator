@@ -46,6 +46,14 @@ export function Shatta({
   const offset = useRef({ x: 0, y: 0 });
   const bubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const anchorRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const placement = useSmartPlacement(
+    anchorRef,
+    panelRef,
+    panel !== "none",
+    `${panel}:${Math.round(pos?.x ?? 0)}:${Math.round(pos?.y ?? 0)}`,
+  );
 
   /* ------------------------------- speaking ------------------------------ */
 
