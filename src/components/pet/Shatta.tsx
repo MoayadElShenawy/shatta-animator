@@ -229,23 +229,36 @@ export function Shatta({
       className="pointer-events-none fixed inset-0 z-50"
       style={variant === "overlay" ? { background: "transparent" } : undefined}
     >
+      {/* The anchor box is exactly the sprite box: nothing else participates in
+          its layout, so bubbles and panels can never push the character around.
+          `pos` stays the single source of truth for her world position. */}
       <div
-        className="pointer-events-auto absolute flex flex-col items-center gap-2"
-        style={{ left: pos.x, top: pos.y }}
+        className="pointer-events-auto absolute"
+        style={{ left: pos.x, top: pos.y, width: SIZE, height: SIZE }}
         onPointerEnter={() => setInteractive(true)}
         onPointerLeave={() => panel === "none" && setInteractive(false)}
       >
         {bubble && settings.bubbles ? (
-          <div className="max-w-[16rem]">
+          <div
+            className="pointer-events-none absolute max-w-[16rem]"
+            style={{
+              bottom: SIZE + 8,
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: "max-content",
+            }}
+          >
             <SpeechBubble text={bubble} side={bubbleSide} />
           </div>
         ) : null}
 
         <div
+          ref={anchorRef}
           role="button"
           tabIndex={0}
           aria-label="Shatta, your desktop cat. Click to poke, double-click for the menu, drag to move."
           className="cursor-grab select-none active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+          style={{ width: SIZE, height: SIZE }}
           onPointerDown={onPointerDown}
           onClick={onClick}
           onDoubleClick={onDoubleClick}
@@ -254,51 +267,65 @@ export function Shatta({
         >
           <Sprite state={mood} size={SIZE} facing={facing} reduceMotion={settings.reduceMotion} />
         </div>
-
-        {panel === "menu" ? (
-          <PetMenu
-            soundsOn={settings.sounds}
-            listening={mic.status === "recording"}
-            onChat={() => setPanel("chat")}
-            onVoice={() => {
-              if (!settings.voiceInput || !mic.supported) return;
-              setPanel("chat");
-              void mic.start();
-            }}
-            onToggleSound={() => update({ sounds: !settings.sounds })}
-            onSettings={() => setPanel("settings")}
-            onClose={closePanel}
-          />
-        ) : null}
-
-        {panel === "chat" && settings.aiChat ? (
-          <QuickChat
-            messages={chat.messages}
-            status={chat.status}
-            error={chat.error}
-            onSend={chat.send}
-            onClear={chat.clear}
-            onClose={closePanel}
-            mic={{
-              status: mic.status,
-              supported: mic.supported && settings.voiceInput,
-              error: mic.error,
-              start: () => void mic.start(),
-              stop: mic.stop,
-            }}
-          />
-        ) : null}
-
-        {panel === "settings" ? (
-          <SettingsPanel
-            settings={settings}
-            onChange={update}
-            onReset={reset}
-            onClose={closePanel}
-            devAvailable={devAvailable}
-          />
-        ) : null}
       </div>
+
+      {panel !== "none" ? (
+        <div
+          ref={panelRef}
+          className="pointer-events-auto fixed"
+          style={{
+            left: placement?.left ?? 0,
+            top: placement?.top ?? 0,
+            opacity: placement ? 1 : 0,
+            width: "max-content",
+          }}
+          onPointerEnter={() => setInteractive(true)}
+        >
+          {panel === "menu" ? (
+            <PetMenu
+              soundsOn={settings.sounds}
+              listening={mic.status === "recording"}
+              onChat={() => setPanel("chat")}
+              onVoice={() => {
+                if (!settings.voiceInput || !mic.supported) return;
+                setPanel("chat");
+                void mic.start();
+              }}
+              onToggleSound={() => update({ sounds: !settings.sounds })}
+              onSettings={() => setPanel("settings")}
+              onClose={closePanel}
+            />
+          ) : null}
+
+          {panel === "chat" && settings.aiChat ? (
+            <QuickChat
+              messages={chat.messages}
+              status={chat.status}
+              error={chat.error}
+              onSend={chat.send}
+              onClear={chat.clear}
+              onClose={closePanel}
+              mic={{
+                status: mic.status,
+                supported: mic.supported && settings.voiceInput,
+                error: mic.error,
+                start: () => void mic.start(),
+                stop: mic.stop,
+              }}
+            />
+          ) : null}
+
+          {panel === "settings" ? (
+            <SettingsPanel
+              settings={settings}
+              onChange={update}
+              onReset={reset}
+              onClose={closePanel}
+              devAvailable={devAvailable}
+            />
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
