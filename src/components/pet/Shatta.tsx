@@ -198,25 +198,24 @@ export function Shatta({
     setMood("dragging", true);
   };
 
-  const onClick = () => {
+  // Taps are detected from pointerup rather than click/dblclick: the sprite's
+  // frame images are swapped while cycling, which can eat the synthetic click.
+  const onTap = () => {
     if (moved.current) return;
     touch();
     if (settings.sounds) playSound("click");
-    if (clickTimer.current) return; // second click handled by onDoubleClick
+    if (clickTimer.current) {
+      // second tap inside the window = double click
+      clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+      setMood("silly", true);
+      setPanel((p) => (p === "none" ? "menu" : "none"));
+      return;
+    }
     clickTimer.current = setTimeout(() => {
       clickTimer.current = null;
       setMood("happy", true);
-    }, 220);
-  };
-
-  const onDoubleClick = () => {
-    if (clickTimer.current) {
-      clearTimeout(clickTimer.current);
-      clickTimer.current = null;
-    }
-    touch();
-    setMood("silly", true);
-    setPanel((p) => (p === "none" ? "menu" : "none"));
+    }, 260);
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
