@@ -221,7 +221,7 @@ export function Shatta({
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      onClick();
+      onTap();
     }
     if (e.key === "m") setPanel((p) => (p === "menu" ? "none" : "menu"));
   };
@@ -268,8 +268,7 @@ export function Shatta({
           className="cursor-grab select-none active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
           style={{ width: SIZE, height: SIZE }}
           onPointerDown={onPointerDown}
-          onClick={onClick}
-          onDoubleClick={onDoubleClick}
+          onPointerUp={onTap}
           onKeyDown={onKeyDown}
           onMouseEnter={() => settings.sounds && playSound("hover")}
         >
