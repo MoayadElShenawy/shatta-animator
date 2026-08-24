@@ -9,6 +9,8 @@ import { useSmartPlacement } from "@/components/pet/useSmartPlacement";
 
 import { usePetSettings } from "@/hooks/usePetSettings";
 import { usePetLife } from "@/pet/usePetState";
+import { useAmbientChatter } from "@/pet/useAmbientChatter";
+import { REACTIONS, notifyInteraction, requestReaction } from "@/pet/behavior";
 import { useShattaChat } from "@/hooks/useShattaChat";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { useDevEvents } from "@/hooks/useDevEvents";
