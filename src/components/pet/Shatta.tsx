@@ -88,13 +88,18 @@ export function Shatta({
 
   const chat = useShattaChat({
     onAnswer: (text) => {
+      notifyInteraction();
       maybeSay(text.length > 160 ? `${text.slice(0, 157)}...` : text);
       if (settings.voiceOutput) void speak(text, settings.volume);
+      requestReaction(REACTIONS.success);
     },
   });
 
+  useAmbientChatter({ enabled: hydrated && settings.bubbles, onSay: say });
+
   const mic = useVoiceInput((text) => chat.send(text));
   const { available: devAvailable } = useDevEvents(settings.devContext, maybeSay);
+
 
   useEffect(() => () => stopSpeaking(), []);
   useEffect(() => {
