@@ -3,6 +3,7 @@ import { getMood, setMood, usePetMood } from "@/hooks/usePetMood";
 import { shatta } from "@/characters/shatta/personality";
 import { playSound } from "@/characters/shatta/sounds";
 import { lineFor, type PetState } from "@/characters/types";
+import { canSpeak, markSpoken } from "@/pet/behavior";
 
 /**
  * The life loop.
@@ -52,8 +53,13 @@ export function usePetLife({ enabled, idleAnimations, sounds, onSay }: PetLifeOp
     const config = shatta.states[mood];
     if (sounds && config.sound && mood !== "idle") playSound(config.sound);
 
+    // State lines share the spontaneous-bubble gate: cooldown + never on top of
+    // an active interaction, so reactions stay visual instead of chatty.
     const line = lineFor(shatta.states, mood);
-    if (line) sayRef.current?.(line);
+    if (line && canSpeak()) {
+      markSpoken(line);
+      sayRef.current?.(line);
+    }
 
     if (config.autoIdleMs <= 0) return;
     const t = setTimeout(() => setMood("idle", true), config.autoIdleMs);
