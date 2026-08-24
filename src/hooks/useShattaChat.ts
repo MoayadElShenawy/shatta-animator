@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { setMood } from "@/hooks/usePetMood";
+import { shattaContext } from "@/pet/context";
 
 export type ChatMessage = { id: string; role: "user" | "assistant"; content: string };
 
@@ -19,6 +20,8 @@ export function useShattaChat(opts: { onAnswer?: (text: string) => void } = {}) 
   onAnswerRef.current = opts.onAnswer;
 
   const run = useCallback(async (history: ChatMessage[]) => {
+    const lastUser = [...history].reverse().find((m) => m.role === "user")?.content ?? null;
+    shattaContext.chatStarted(lastUser ?? undefined);
     setError(null);
     setStatus("thinking");
     setMood("thinking", true);
@@ -66,8 +69,14 @@ export function useShattaChat(opts: { onAnswer?: (text: string) => void } = {}) 
       }
       setStatus("idle");
       setMood("happy", true);
-      if (full.trim()) onAnswerRef.current?.(full);
+      if (full.trim()) {
+        shattaContext.chatResponded(lastUser, full);
+        onAnswerRef.current?.(full);
+      } else {
+        shattaContext.chatEnded();
+      }
     } catch (e) {
+      shattaContext.chatEnded();
       if ((e as Error).name === "AbortError") {
         setStatus("idle");
         setMood("idle", true);
@@ -100,6 +109,7 @@ export function useShattaChat(opts: { onAnswer?: (text: string) => void } = {}) 
 
   const clear = useCallback(() => {
     abort.current?.abort();
+    shattaContext.chatEnded();
     setMessages([]);
     setStatus("idle");
     setError(null);
