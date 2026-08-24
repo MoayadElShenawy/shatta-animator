@@ -9,6 +9,8 @@ import { useSmartPlacement } from "@/components/pet/useSmartPlacement";
 
 import { usePetSettings } from "@/hooks/usePetSettings";
 import { usePetLife } from "@/pet/usePetState";
+import { useAmbientChatter } from "@/pet/useAmbientChatter";
+import { REACTIONS, notifyInteraction, requestReaction } from "@/pet/behavior";
 import { useShattaChat } from "@/hooks/useShattaChat";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { useDevEvents } from "@/hooks/useDevEvents";
@@ -86,13 +88,18 @@ export function Shatta({
 
   const chat = useShattaChat({
     onAnswer: (text) => {
+      notifyInteraction();
       maybeSay(text.length > 160 ? `${text.slice(0, 157)}...` : text);
       if (settings.voiceOutput) void speak(text, settings.volume);
+      requestReaction(REACTIONS.success);
     },
   });
 
+  useAmbientChatter({ enabled: hydrated && settings.bubbles, onSay: say });
+
   const mic = useVoiceInput((text) => chat.send(text));
   const { available: devAvailable } = useDevEvents(settings.devContext, maybeSay);
+
 
   useEffect(() => () => stopSpeaking(), []);
   useEffect(() => {
@@ -192,6 +199,7 @@ export function Shatta({
 
   const onPointerDown = (e: React.PointerEvent) => {
     touch();
+    notifyInteraction();
     dragging.current = true;
     moved.current = false;
     offset.current = { x: e.clientX - (pos?.x ?? 0), y: e.clientY - (pos?.y ?? 0) };
@@ -205,18 +213,22 @@ export function Shatta({
     touch();
     if (settings.sounds) playSound("click");
     if (clickTimer.current) {
-      // second tap inside the window = double click
+      // second tap inside the window = double click: brief startle, then menu.
       clearTimeout(clickTimer.current);
       clickTimer.current = null;
-      setMood("silly", true);
+      requestReaction(REACTIONS.menu);
       setPanel((p) => (p === "none" ? "menu" : "none"));
       return;
     }
     clickTimer.current = setTimeout(() => {
       clickTimer.current = null;
-      setMood("happy", true);
+      // Single click = she noticed you. Cooldown-gated so repeated pokes reuse
+      // the running reaction instead of stacking new ones.
+      const pokes = REACTIONS.poke;
+      requestReaction(pokes[Math.floor(Math.random() * pokes.length)]!);
     }, 260);
   };
+
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
