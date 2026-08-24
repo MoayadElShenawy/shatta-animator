@@ -11,6 +11,7 @@ import {
   nextSpontaneousDelay,
   pickFresh,
 } from "@/pet/behavior";
+import { shattaContext } from "@/pet/context";
 
 /**
  * Occasional spontaneous bubbles.
@@ -42,6 +43,7 @@ export function useAmbientChatter({
           const line = pickFresh(bored ? [...BORED_LINES, ...SPONTANEOUS_LINES] : SPONTANEOUS_LINES);
           if (line) {
             markSpoken(line);
+            shattaContext.spontaneous();
             sayRef.current(line);
           }
         }

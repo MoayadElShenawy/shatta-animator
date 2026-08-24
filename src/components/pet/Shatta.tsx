@@ -11,6 +11,7 @@ import { usePetSettings } from "@/hooks/usePetSettings";
 import { usePetLife } from "@/pet/usePetState";
 import { useAmbientChatter } from "@/pet/useAmbientChatter";
 import { REACTIONS, notifyInteraction, requestReaction } from "@/pet/behavior";
+import { getShattaContext, shattaContext } from "@/pet/context";
 import { useShattaChat } from "@/hooks/useShattaChat";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { useDevEvents } from "@/hooks/useDevEvents";
@@ -102,6 +103,18 @@ export function Shatta({
 
 
   useEffect(() => () => stopSpeaking(), []);
+
+  // Keep the interaction context aware of the open panel, and expose a read-only
+  // snapshot for debugging / future AI consumers. Observation only.
+  useEffect(() => {
+    shattaContext.menu(panel !== "none");
+  }, [panel]);
+
+  useEffect(() => {
+    (window as unknown as { shattaContextSnapshot?: () => unknown }).shattaContextSnapshot =
+      () => getShattaContext();
+  }, []);
+
   useEffect(() => {
     if (!settings.voiceOutput) stopSpeaking();
   }, [settings.voiceOutput]);
@@ -216,12 +229,14 @@ export function Shatta({
       // second tap inside the window = double click: brief startle, then menu.
       clearTimeout(clickTimer.current);
       clickTimer.current = null;
+      shattaContext.doubleClick();
       requestReaction(REACTIONS.menu);
       setPanel((p) => (p === "none" ? "menu" : "none"));
       return;
     }
     clickTimer.current = setTimeout(() => {
       clickTimer.current = null;
+      shattaContext.click();
       // Single click = she noticed you. Cooldown-gated so repeated pokes reuse
       // the running reaction instead of stacking new ones.
       const pokes = REACTIONS.poke;
