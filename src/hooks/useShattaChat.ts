@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from "react";
+import { askShatta } from "@/ai/askShatta";
 import { setMood } from "@/hooks/usePetMood";
-import { shattaContext } from "@/pet/context";
+import { getShattaContext, shattaContext } from "@/pet/context";
+
 
 export type ChatMessage = { id: string; role: "user" | "assistant"; content: string };
 
@@ -29,34 +31,31 @@ export function useShattaChat(opts: { onAnswer?: (text: string) => void } = {}) 
     abort.current = controller;
 
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const id = uid();
+      let started = false;
+      let full = "";
+
+      full = await askShatta({
+        messages: history.map((m) => ({ role: m.role, content: m.content })),
+        context: getShattaContext(),
         signal: controller.signal,
-        body: JSON.stringify({
-          messages: history.map((m) => ({ role: m.role, content: m.content })),
-        }),
+        onChunk: (text) => {
+          if (!started) {
+            started = true;
+            setMessages((m) => [...m, { id, role: "assistant", content: "" }]);
+            setStatus("streaming");
+            setMood("speaking", true);
+          }
+          setMessages((m) => m.map((msg) => (msg.id === id ? { ...msg, content: text } : msg)));
+        },
       });
 
-      if (!res.ok || !res.body) {
-        const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(data?.error ?? "Shatta couldn't answer right now.");
+      if (!started) {
+        setMessages((m) => [...m, { id, role: "assistant", content: "" }]);
+        setStatus("streaming");
+        setMood("speaking", true);
       }
 
-      const id = uid();
-      setMessages((m) => [...m, { id, role: "assistant", content: "" }]);
-      setStatus("streaming");
-      setMood("speaking", true);
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let full = "";
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        full += decoder.decode(value, { stream: true });
-        setMessages((m) => m.map((msg) => (msg.id === id ? { ...msg, content: full } : msg)));
-      }
 
       if (!full.trim()) {
         setMessages((m) =>
