@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from "react";
+import { askShatta } from "@/ai/askShatta";
 import { setMood } from "@/hooks/usePetMood";
-import { shattaContext } from "@/pet/context";
+import { getShattaContext, shattaContext } from "@/pet/context";
+
 
 export type ChatMessage = { id: string; role: "user" | "assistant"; content: string };
 
