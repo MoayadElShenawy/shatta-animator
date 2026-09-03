@@ -11,7 +11,7 @@ import {
   nextSpontaneousDelay,
   pickFresh,
 } from "@/pet/behavior";
-import { shattaContext } from "@/pet/context";
+import { getShattaContext, shattaContext } from "@/pet/context";
 
 /**
  * Occasional spontaneous bubbles.
@@ -37,8 +37,15 @@ export function useAmbientChatter({
     const loop = () => {
       timer = setTimeout(() => {
         const mood = getMood();
-        const quiet = mood === "idle" || mood === "blink" || mood === "stretching" || mood === "grooming";
-        if (quiet && canSpeak()) {
+        const quiet =
+          mood === "idle" ||
+          mood === "blink" ||
+          mood === "stretching" ||
+          mood === "grooming" ||
+          mood === "sleepy" ||
+          mood === "sleeping";
+        const ctx = getShattaContext();
+        if (quiet && !ctx.interacting && canSpeak()) {
           const bored = msSinceInteraction() > BEHAVIOR.boredAfterMs;
           const line = pickFresh(bored ? [...BORED_LINES, ...SPONTANEOUS_LINES] : SPONTANEOUS_LINES);
           if (line) {
