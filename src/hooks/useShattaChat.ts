@@ -1,8 +1,7 @@
 import { useCallback, useRef, useState } from "react";
-import { askShatta } from "@/ai/askShatta";
 import { setMood } from "@/hooks/usePetMood";
-import { getShattaContext, shattaContext } from "@/pet/context";
-
+import { shattaContext } from "@/pet/context";
+import { askPet, type BrainFlags } from "@/pet/brain";
 
 export type ChatMessage = { id: string; role: "user" | "assistant"; content: string };
 
@@ -10,19 +9,25 @@ const uid = () => Math.random().toString(36).slice(2);
 
 /**
  * Shatta conversation state: one conversation, kept in memory for the session.
- * Streams plain-text chunks from /api/chat and drives the companion state
- * machine (thinking -> speaking -> idle) while it works.
+ * Talks to the pet brain (which composes character + context + capabilities and
+ * calls the AI adapter) — never to a network endpoint directly. Drives the
+ * companion state machine (thinking -> speaking -> idle) while it works.
  */
-export function useShattaChat(opts: { onAnswer?: (text: string) => void } = {}) {
+export function useShattaChat(
+  opts: { onAnswer?: (text: string) => void; flags?: Partial<BrainFlags> } = {},
+) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<"idle" | "thinking" | "streaming" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   const onAnswerRef = useRef(opts.onAnswer);
   onAnswerRef.current = opts.onAnswer;
+  const flagsRef = useRef(opts.flags);
+  flagsRef.current = opts.flags;
 
   const run = useCallback(async (history: ChatMessage[]) => {
-    const lastUser = [...history].reverse().find((m) => m.role === "user")?.content ?? null;
+    const lastIndex = [...history].map((m) => m.role).lastIndexOf("user");
+    const lastUser = lastIndex >= 0 ? (history[lastIndex]?.content ?? null) : null;
     shattaContext.chatStarted(lastUser ?? undefined);
     setError(null);
     setStatus("thinking");
@@ -30,62 +35,74 @@ export function useShattaChat(opts: { onAnswer?: (text: string) => void } = {}) 
     const controller = new AbortController();
     abort.current = controller;
 
-    try {
-      const id = uid();
-      let started = false;
-      let full = "";
+    // The brain appends the current user message itself — send everything
+    // before it as history so the latest turn is never duplicated.
+    const prior = (lastIndex >= 0 ? history.slice(0, lastIndex) : history).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
 
-      full = await askShatta({
-        messages: history.map((m) => ({ role: m.role, content: m.content })),
-        context: getShattaContext(),
-        signal: controller.signal,
-        onChunk: (text) => {
-          if (!started) {
-            started = true;
-            setMessages((m) => [...m, { id, role: "assistant", content: "" }]);
-            setStatus("streaming");
-            setMood("speaking", true);
-          }
-          setMessages((m) => m.map((msg) => (msg.id === id ? { ...msg, content: text } : msg)));
-        },
-      });
+    const id = uid();
+    let started = false;
+    let full = "";
 
-      if (!started) {
-        setMessages((m) => [...m, { id, role: "assistant", content: "" }]);
-        setStatus("streaming");
-        setMood("speaking", true);
-      }
+    const response = await askPet({
+      message: lastUser ?? "",
+      history: prior,
+      ...(flagsRef.current ? { flags: flagsRef.current } : {}),
+      signal: controller.signal,
+      onChunk: (chunk) => {
+        full += chunk;
+        if (!started) {
+          started = true;
+          setMessages((m) => [...m, { id, role: "assistant", content: full }]);
+          setStatus("streaming");
+          setMood("speaking", true);
+        } else {
+          setMessages((m) => m.map((msg) => (msg.id === id ? { ...msg, content: full } : msg)));
+        }
+      },
+    });
 
-
-      if (!full.trim()) {
-        setMessages((m) =>
-          m.map((msg) =>
-            msg.id === id
-              ? { ...msg, content: "Mrrp. I came back empty-pawed. Ask me again?" }
-              : msg,
-          ),
-        );
-      }
-      setStatus("idle");
-      setMood("happy", true);
-      if (full.trim()) {
-        shattaContext.chatResponded(lastUser, full);
-        onAnswerRef.current?.(full);
-      } else {
-        shattaContext.chatEnded();
-      }
-    } catch (e) {
+    if (!response.success) {
       shattaContext.chatEnded();
-      if ((e as Error).name === "AbortError") {
+      if (response.error === "aborted" || controller.signal.aborted) {
         setStatus("idle");
         setMood("idle", true);
         return;
       }
       setStatus("error");
-      setError(e instanceof Error ? e.message : "Something went wrong.");
+      setError(response.error ?? "Something went wrong.");
       setMood("annoyed", true);
+      return;
+    }
+
+    const text = response.text;
+    if (!started) {
+      setMessages((m) => [...m, { id, role: "assistant", content: text }]);
+    } else if (text && text !== full) {
+      setMessages((m) => m.map((msg) => (msg.id === id ? { ...msg, content: text } : msg)));
+    }
+
+    if (!text.trim()) {
+      setMessages((m) =>
+        m.map((msg) =>
+          msg.id === id
+            ? { ...msg, content: "Mrrp. I came back empty-pawed. Ask me again?" }
+            : msg,
+        ),
+      );
+    }
+    setStatus("idle");
+    setMood("happy", true);
+    if (text.trim()) {
+      shattaContext.chatResponded(lastUser, text);
+      onAnswerRef.current?.(text);
+    } else {
+      shattaContext.chatEnded();
     }
   }, []);
+
 
   const send = useCallback(
     (text: string) => {
