@@ -88,6 +88,7 @@ export function Shatta({
   });
 
   const chat = useShattaChat({
+    flags: { fileOperations: settings.fileOperations },
     onAnswer: (text) => {
       notifyInteraction();
       maybeSay(text.length > 160 ? `${text.slice(0, 157)}...` : text);
@@ -95,6 +96,7 @@ export function Shatta({
       requestReaction(REACTIONS.success);
     },
   });
+
 
   useAmbientChatter({ enabled: hydrated && settings.bubbles, onSay: say });
 

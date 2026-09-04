@@ -120,9 +120,12 @@ export const shatta: CharacterDefinition = {
     chat: true,
     voice: true,
     spontaneous: true,
-    // Declared boundaries only — none of these are implemented yet.
-    allowedCapabilities: ["web_search"],
+    // Boundaries the brain may consider. Execution still depends on the
+    // permission gate, the user's settings flag and — for real filesystem
+    // access — the presence of the desktop bridge.
+    allowedCapabilities: ["web_search", "file_search", "file_copy", "file_move"],
   },
+
 
   voice: {
     instructions: `Character: a tiny animated cat girl — a very small creature that happens to talk, roughly the size of a kitten. Think a young cartoon character, about 8 years old in feel, NOT an adult woman, NOT a narrator, NOT an assistant.

@@ -12,15 +12,16 @@
 
 import { askShatta } from "@/ai";
 import type { AiMessage, AiResponse } from "@/ai/types";
-import { describeCapabilities, type CapabilityGate } from "@/capabilities/registry";
+import { describeCapabilities, runCapability, type CapabilityGate } from "@/capabilities/registry";
 import { describeIntent, routeCapability, type CapabilityIntent } from "@/capabilities/routing";
-import type { CapabilityDescriptor } from "@/capabilities/types";
+import type { CapabilityDescriptor, CapabilityResult } from "@/capabilities/types";
 import { getActiveCharacter } from "@/characters/registry";
 import type { CharacterDefinition } from "@/characters/types";
 import { requestConfirmation, type PendingConfirmation } from "@/permissions/confirmations";
 import { checkPermission } from "@/permissions/policy";
 import type { PermissionDecision } from "@/permissions/types";
 import { getShattaContext, type ShattaContext } from "@/pet/context";
+
 
 export type BrainFlags = CapabilityGate["flags"];
 
@@ -126,4 +127,32 @@ export function decideTurn(request: BrainRequest): BrainDecision {
 
   return { route: "capability", intent, permission, confirmation };
 }
+
+/**
+ * Execute a capability described by a `BrainDecision`, if permission allows.
+ * Returns `null` when the decision is a conversation or still needs
+ * confirmation — the caller keeps its normal `askPet` flow.
+ */
+export async function executeDecision(
+  decision: BrainDecision,
+  request: BrainRequest,
+): Promise<CapabilityResult | null> {
+  if (decision.route !== "capability" || !decision.intent.capability) return null;
+  if (!decision.permission || decision.permission.outcome !== "allowed") return null;
+  const character = request.character ?? getActiveCharacter();
+  const flags = { ...DEFAULT_BRAIN_FLAGS, ...request.flags };
+  const gate: CapabilityGate = {
+    allowed: character.capabilities?.allowedCapabilities ?? [],
+    flags,
+  };
+  const runOptions: Parameters<typeof runCapability>[3] = {};
+  if (request.signal) runOptions.signal = request.signal;
+  return runCapability(
+    decision.intent.capability,
+    decision.intent.metadata,
+    gate,
+    runOptions,
+  );
+}
+
 

@@ -1,11 +1,25 @@
 import { useCallback, useRef, useState } from "react";
 import { setMood } from "@/hooks/usePetMood";
 import { shattaContext } from "@/pet/context";
-import { askPet, type BrainFlags } from "@/pet/brain";
+import { askPet, decideTurn, executeDecision, type BrainFlags } from "@/pet/brain";
+
 
 export type ChatMessage = { id: string; role: "user" | "assistant"; content: string };
 
 const uid = () => Math.random().toString(36).slice(2);
+
+function summariseCapability(id: string, result: Awaited<ReturnType<typeof executeDecision>>): string {
+  if (!result) return `Capability "${id}" did not run.`;
+  if (result.ok) {
+    try {
+      return `Capability "${id}" succeeded with: ${JSON.stringify(result.data)}`;
+    } catch {
+      return `Capability "${id}" succeeded.`;
+    }
+  }
+  return `Capability "${id}" failed (${result.reason}): ${result.error}`;
+}
+
 
 /**
  * Shatta conversation state: one conversation, kept in memory for the session.
@@ -46,10 +60,40 @@ export function useShattaChat(
     let started = false;
     let full = "";
 
-    const response = await askPet({
+    // Capability routing: if this turn asks for a real capability we run it
+    // first and hand the structured result to the AI as extra context, so
+    // Shatta can respond naturally about what actually happened. Normal
+    // conversation stays on the pure `askPet` path.
+    let capabilityNote: string | null = null;
+    const decision = decideTurn({
       message: lastUser ?? "",
+      ...(flagsRef.current ? { flags: flagsRef.current } : {}),
+    });
+    if (decision.route === "capability") {
+      if (decision.permission?.outcome === "allowed") {
+        const result = await executeDecision(decision, {
+          message: lastUser ?? "",
+          ...(flagsRef.current ? { flags: flagsRef.current } : {}),
+          signal: controller.signal,
+        });
+        capabilityNote = summariseCapability(decision.intent.capability!, result);
+      } else if (decision.permission?.outcome === "needs_confirmation") {
+        capabilityNote = `Capability "${decision.intent.capability}" needs the user to explicitly confirm before it can run.`;
+      } else if (decision.permission?.outcome === "unavailable") {
+        capabilityNote = `Capability "${decision.intent.capability}" is unavailable: ${decision.permission.message}`;
+      }
+    }
+
+
+    const enrichedMessage = capabilityNote
+      ? `${lastUser ?? ""}\n\n[Capability result for the assistant, do not reveal literally:] ${capabilityNote}`
+      : (lastUser ?? "");
+
+    const response = await askPet({
+      message: enrichedMessage,
       history: prior,
       ...(flagsRef.current ? { flags: flagsRef.current } : {}),
+
       signal: controller.signal,
       onChunk: (chunk) => {
         full += chunk;

@@ -12,7 +12,9 @@ const TOGGLES: Toggle[] = [
   { key: "voiceInput", label: "Voice input", hint: "Dictate with the microphone button." },
   { key: "voiceOutput", label: "Voice output", hint: "Read answers out loud. Never autoplays without this." },
   { key: "devContext", label: "Developer context", hint: "Desktop only: branch + changed-file count. Never your code." },
+  { key: "fileOperations", label: "File helpers", hint: "Desktop only: let Shatta search, copy, and move files in your approved folders." },
 ];
+
 
 /** Preferences panel for the companion. Pure presentation over usePetSettings. */
 export function SettingsPanel({
