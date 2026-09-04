@@ -8,6 +8,19 @@ export type ChatMessage = { id: string; role: "user" | "assistant"; content: str
 
 const uid = () => Math.random().toString(36).slice(2);
 
+function summariseCapability(id: string, result: Awaited<ReturnType<typeof executeDecision>>): string {
+  if (!result) return `Capability "${id}" did not run.`;
+  if (result.ok) {
+    try {
+      return `Capability "${id}" succeeded with: ${JSON.stringify(result.data)}`;
+    } catch {
+      return `Capability "${id}" succeeded.`;
+    }
+  }
+  return `Capability "${id}" failed (${result.reason}): ${result.error}`;
+}
+
+
 /**
  * Shatta conversation state: one conversation, kept in memory for the session.
  * Talks to the pet brain (which composes character + context + capabilities and
