@@ -47,6 +47,31 @@ export function useShattaChat(
     let started = false;
     let full = "";
 
+    // Capability routing: if this turn asks for a real capability we run it
+    // first and hand the structured result to the AI as extra context, so
+    // Shatta can respond naturally about what actually happened. Normal
+    // conversation stays on the pure `askPet` path.
+    let capabilityNote: string | null = null;
+    const decision = decideTurn({
+      message: lastUser ?? "",
+      ...(flagsRef.current ? { flags: flagsRef.current } : {}),
+    });
+    if (decision.route === "capability") {
+      if (decision.permission?.outcome === "allowed") {
+        const result = await executeDecision(decision, {
+          message: lastUser ?? "",
+          ...(flagsRef.current ? { flags: flagsRef.current } : {}),
+          signal: controller.signal,
+        });
+        capabilityNote = summariseCapability(decision.intent.capability!, result);
+      } else if (decision.permission?.outcome === "needs_confirmation") {
+        capabilityNote = `Capability "${decision.intent.capability}" needs the user to explicitly confirm before it can run.`;
+      } else if (decision.permission?.outcome === "unavailable") {
+        capabilityNote = `Capability "${decision.intent.capability}" is unavailable: ${decision.permission.message}`;
+      }
+    }
+
+
     const response = await askPet({
       message: lastUser ?? "",
       history: prior,
