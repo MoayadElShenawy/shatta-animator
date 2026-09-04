@@ -132,10 +132,10 @@ describe("confirmation state", () => {
   });
 });
 
-describe("execution gateway stays closed", () => {
-  it("never executes, even when enabled and confirmed", async () => {
-    for (const id of ALL) {
-      const res = await runCapability(id as never, {}, enabledGate, {
+describe("execution gateway stays closed for unimplemented capabilities", () => {
+  it("web_search / file_delete / system_command never execute", async () => {
+    for (const id of ["web_search", "file_delete", "system_command"] as const) {
+      const res = await runCapability(id, {}, enabledGate, {
         confirmation: { approved: true, at: Date.now() },
       });
       expect(res.ok).toBe(false);
@@ -144,11 +144,12 @@ describe("execution gateway stays closed", () => {
   });
 
   it("denies disabled capabilities before anything else", async () => {
-    const res = await runCapability("file_search", {}, disabledGate);
+    const res = await runCapability("file_search", { query: "x" }, disabledGate);
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.reason).toBe("denied");
   });
 });
+
 
 describe("brain decision flow", () => {
   it("keeps normal conversation on the askShatta path", () => {
