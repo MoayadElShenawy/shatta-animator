@@ -1,7 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import { setMood } from "@/hooks/usePetMood";
 import { shattaContext } from "@/pet/context";
-import { askPet, type BrainFlags } from "@/pet/brain";
+import { askPet, decideTurn, executeDecision, type BrainFlags } from "@/pet/brain";
+
 
 export type ChatMessage = { id: string; role: "user" | "assistant"; content: string };
 
