@@ -15,6 +15,8 @@ export type PetSettings = {
   volume: number;
   /** Opt-in developer context (desktop only): branch + changed-file count */
   devContext: boolean;
+  /** Opt-in: allow file capabilities (search/copy/move) via the desktop bridge */
+  fileOperations: boolean;
 };
 
 export const DEFAULT_SETTINGS: PetSettings = {
@@ -27,7 +29,9 @@ export const DEFAULT_SETTINGS: PetSettings = {
   voiceOutput: false,
   volume: 0.8,
   devContext: false,
+  fileOperations: false,
 };
+
 
 const STORAGE_KEY = "shatta:settings:v1";
 
