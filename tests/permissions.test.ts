@@ -72,11 +72,12 @@ describe("permission policy", () => {
       expect(d.readOnly).toBe(true);
       expect(d.destructive).toBe(false);
       expect(d.requiresConfirmation).toBe(false);
-      // declared but unimplemented in this phase
-      expect(d.outcome).toBe("unavailable");
-      expect(d.reason).toBe("not_implemented");
     }
+    // web_search stays unimplemented in this phase; file_search is available
+    expect(checkPermission({ capability: "web_search", gate: enabledGate }).outcome).toBe("unavailable");
+    expect(checkPermission({ capability: "file_search", gate: enabledGate }).outcome).toBe("allowed");
   });
+
 
   it("does not require destructive confirmation for copy/move by rule", () => {
     for (const id of ["file_copy", "file_move"] as const) {
