@@ -12,15 +12,16 @@
 
 import { askShatta } from "@/ai";
 import type { AiMessage, AiResponse } from "@/ai/types";
-import { describeCapabilities, type CapabilityGate } from "@/capabilities/registry";
+import { describeCapabilities, runCapability, type CapabilityGate } from "@/capabilities/registry";
 import { describeIntent, routeCapability, type CapabilityIntent } from "@/capabilities/routing";
-import type { CapabilityDescriptor } from "@/capabilities/types";
+import type { CapabilityDescriptor, CapabilityResult } from "@/capabilities/types";
 import { getActiveCharacter } from "@/characters/registry";
 import type { CharacterDefinition } from "@/characters/types";
 import { requestConfirmation, type PendingConfirmation } from "@/permissions/confirmations";
 import { checkPermission } from "@/permissions/policy";
 import type { PermissionDecision } from "@/permissions/types";
 import { getShattaContext, type ShattaContext } from "@/pet/context";
+
 
 export type BrainFlags = CapabilityGate["flags"];
 
