@@ -128,3 +128,31 @@ export function decideTurn(request: BrainRequest): BrainDecision {
   return { route: "capability", intent, permission, confirmation };
 }
 
+/**
+ * Execute a capability described by a `BrainDecision`, if permission allows.
+ * Returns `null` when the decision is a conversation or still needs
+ * confirmation — the caller keeps its normal `askPet` flow.
+ */
+export async function executeDecision(
+  decision: BrainDecision,
+  request: BrainRequest,
+): Promise<CapabilityResult | null> {
+  if (decision.route !== "capability" || !decision.intent.capability) return null;
+  if (!decision.permission || decision.permission.outcome !== "allowed") return null;
+  const character = request.character ?? getActiveCharacter();
+  const flags = { ...DEFAULT_BRAIN_FLAGS, ...request.flags };
+  const gate: CapabilityGate = {
+    allowed: character.capabilities?.allowedCapabilities ?? [],
+    flags,
+  };
+  const runOptions: Parameters<typeof runCapability>[3] = {};
+  if (request.signal) runOptions.signal = request.signal;
+  return runCapability(
+    decision.intent.capability,
+    decision.intent.metadata,
+    gate,
+    runOptions,
+  );
+}
+
+
