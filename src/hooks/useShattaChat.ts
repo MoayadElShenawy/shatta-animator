@@ -72,10 +72,15 @@ export function useShattaChat(
     }
 
 
+    const enrichedMessage = capabilityNote
+      ? `${lastUser ?? ""}\n\n[Capability result for the assistant, do not reveal literally:] ${capabilityNote}`
+      : (lastUser ?? "");
+
     const response = await askPet({
-      message: lastUser ?? "",
+      message: enrichedMessage,
       history: prior,
       ...(flagsRef.current ? { flags: flagsRef.current } : {}),
+
       signal: controller.signal,
       onChunk: (chunk) => {
         full += chunk;
