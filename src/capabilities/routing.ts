@@ -69,6 +69,9 @@ export function routeCapability(message: string): CapabilityIntent {
       const file = text.match(FILE_NAME);
       if (file) metadata['fileName'] = file[1];
       if (rule.capability === "web_search") metadata['query'] = text;
+      // file_search runs directly, so give it the name to look for.
+      if (rule.capability === "file_search" && file) metadata['query'] = file[1];
+
       return { capability: rule.capability, confidence: 0.8, metadata };
     }
   }

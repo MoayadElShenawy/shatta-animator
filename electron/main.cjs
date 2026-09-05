@@ -158,3 +158,142 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => app.quit());
+
+/* --------------------- scoped filesystem bridge (search / copy / move) ---------------------
+ * The renderer never sends an OS path. It sends { scope, path } where scope is one of three
+ * user-owned folders. Everything is resolved here and rejected if it escapes its root.
+ * No delete, no shell execution, no reading of file contents.
+ */
+
+const FS_SCOPES = ["desktop", "documents", "downloads"];
+const MAX_DEPTH = 4;
+const MAX_ENTRIES = 4000;
+
+function scopeRoot(scope) {
+  try {
+    if (scope === "desktop") return app.getPath("desktop");
+    if (scope === "documents") return app.getPath("documents");
+    if (scope === "downloads") return app.getPath("downloads");
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function fsError(reason, error) {
+  return { ok: false, reason, error };
+}
+
+/** Resolve a scoped relative path, guaranteeing it stays inside its root. */
+function resolveScoped(location) {
+  if (!location || typeof location !== "object") return { error: fsError("invalid", "Missing location.") };
+  const { scope, path: rel } = location;
+  if (!FS_SCOPES.includes(scope)) return { error: fsError("denied", `Scope "${scope}" is not allowed.`) };
+  if (typeof rel !== "string" || !rel.trim()) return { error: fsError("invalid", "Missing path.") };
+  if (rel.includes("\0")) return { error: fsError("invalid", "Invalid path.") };
+  const root = scopeRoot(scope);
+  if (!root) return { error: fsError("unavailable", `Scope "${scope}" is not available.`) };
+  const normalizedRoot = path.resolve(root) + path.sep;
+  const full = path.resolve(root, rel);
+  if (full !== path.resolve(root) && !full.startsWith(normalizedRoot)) {
+    return { error: fsError("denied", "Path escapes its allowed folder.") };
+  }
+  return { root, full };
+}
+
+function walk(root, matcher, out, depth, budget) {
+  if (depth > MAX_DEPTH || out.length >= budget.limit || budget.seen > MAX_ENTRIES) return;
+  let entries = [];
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (out.length >= budget.limit || budget.seen > MAX_ENTRIES) return;
+    budget.seen += 1;
+    if (entry.name.startsWith(".")) continue;
+    const full = path.join(root, entry.name);
+    if (entry.isSymbolicLink()) continue;
+    if (matcher(entry.name)) {
+      let stat = null;
+      try {
+        stat = fs.statSync(full);
+      } catch {
+        stat = null;
+      }
+      out.push({ full, name: entry.name, type: entry.isDirectory() ? "folder" : "file", stat });
+    }
+    if (entry.isDirectory()) walk(full, matcher, out, depth + 1, budget);
+  }
+}
+
+ipcMain.handle("fs:scopes", () => FS_SCOPES.filter((s) => scopeRoot(s)));
+
+ipcMain.handle("fs:search", (_e, input) => {
+  const query = input && typeof input.query === "string" ? input.query.trim().toLowerCase() : "";
+  if (!query || query.includes("..") || /[/\\\\\0]/.test(query)) {
+    return fsError("invalid", "Invalid search query.");
+  }
+  const limit = Math.min(Math.max(1, Number(input && input.limit) || 10), 25);
+  const scopes = input && FS_SCOPES.includes(input.scope) ? [input.scope] : FS_SCOPES;
+  const matcher = (name) => name.toLowerCase().includes(query);
+  const results = [];
+  for (const scope of scopes) {
+    const root = scopeRoot(scope);
+    if (!root || !fs.existsSync(root)) continue;
+    const hits = [];
+    walk(root, matcher, hits, 0, { limit, seen: 0 });
+    for (const hit of hits) {
+      results.push({
+        name: hit.name,
+        scope,
+        path: path.relative(root, hit.full).split(path.sep).join("/"),
+        type: hit.type,
+        ...(hit.stat ? { sizeBytes: hit.stat.size, modifiedAt: hit.stat.mtimeMs } : {}),
+      });
+      if (results.length >= limit) break;
+    }
+    if (results.length >= limit) break;
+  }
+  return { ok: true, data: results };
+});
+
+function transfer(input, mode) {
+  const source = resolveScoped(input && input.source);
+  if (source.error) return source.error;
+  const destination = resolveScoped(input && input.destination);
+  if (destination.error) return destination.error;
+  if (!fs.existsSync(source.full)) return fsError("not_found", "Source file was not found.");
+  let stat;
+  try {
+    stat = fs.statSync(source.full);
+  } catch {
+    return fsError("failed", "Could not read the source file.");
+  }
+  if (!stat.isFile()) return fsError("invalid", "Only files can be copied or moved.");
+  if (fs.existsSync(destination.full)) {
+    return fsError("exists", "A file already exists at the destination — nothing was overwritten.");
+  }
+  try {
+    fs.mkdirSync(path.dirname(destination.full), { recursive: true });
+    if (mode === "copy") fs.copyFileSync(source.full, destination.full, fs.constants.COPYFILE_EXCL);
+    else fs.renameSync(source.full, destination.full);
+  } catch (err) {
+    if (err && err.code === "EEXIST") return fsError("exists", "Destination already exists.");
+    if (err && err.code === "EXDEV" && mode === "move") {
+      try {
+        fs.copyFileSync(source.full, destination.full, fs.constants.COPYFILE_EXCL);
+        fs.unlinkSync(source.full);
+      } catch {
+        return fsError("failed", "Move across drives failed.");
+      }
+    } else {
+      return fsError("failed", "The operation failed.");
+    }
+  }
+  return { ok: true, data: { destination: input.destination } };
+}
+
+ipcMain.handle("fs:copy", (_e, input) => transfer(input, "copy"));
+ipcMain.handle("fs:move", (_e, input) => transfer(input, "move"));
