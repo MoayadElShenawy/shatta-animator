@@ -7,9 +7,13 @@
  *
  * The bridge NEVER accepts raw OS paths from the caller: it takes a
  * validated `{ scope, path }` and the desktop shell resolves the scope
- * to a real, user-owned folder that it has already approved.
+ * to a real, user-approved folder. Optional members ("remove", "runCommand",
+ * folder granting) may be missing — a missing member means the capability is
+ * genuinely not supported by this runtime, and it reports that instead of
+ * pretending.
  */
 
+import type { GrantedFolder } from "@/capabilities/access";
 import type { FileLocation, FileScope } from "@/capabilities/paths";
 
 export type FsSearchResult = {
@@ -23,6 +27,8 @@ export type FsSearchResult = {
 
 export type FsErrorReason =
   | "unavailable"
+  | "not_supported"
+  | "rejected"
   | "denied"
   | "not_found"
   | "exists"
@@ -31,12 +37,27 @@ export type FsErrorReason =
 
 export type FsResult<T> = { ok: true; data: T } | { ok: false; reason: FsErrorReason; error: string };
 
+export type SystemCommandRequest = {
+  action: string;
+  location?: FileLocation;
+};
+
 export type FilesystemBridge = {
   /** Which scopes the shell agreed to expose in this session. */
   scopes: () => Promise<readonly FileScope[]>;
   search: (input: { query: string; scope?: FileScope; limit?: number }) => Promise<FsResult<readonly FsSearchResult[]>>;
   copy: (input: { source: FileLocation; destination: FileLocation }) => Promise<FsResult<{ destination: FileLocation }>>;
   move: (input: { source: FileLocation; destination: FileLocation }) => Promise<FsResult<{ destination: FileLocation }>>;
+  /** Real deletion. Only ever reached through an approved confirmation. */
+  remove?: (input: { target: FileLocation }) => Promise<FsResult<{ target: FileLocation; trashed: boolean }>>;
+  /** Folders the user picked in the OS dialog during this session. */
+  grants?: () => Promise<FsResult<readonly GrantedFolder[]>>;
+  /** Opens the OS folder picker. User action only — never AI-initiated. */
+  requestFolderAccess?: () => Promise<FsResult<GrantedFolder | null>>;
+  /** Explicit whole-device grant. May legitimately be unsupported. */
+  requestDeviceAccess?: () => Promise<FsResult<{ granted: boolean }>>;
+  /** Runs one allowlisted system action. Never a raw shell string. */
+  runCommand?: (input: SystemCommandRequest) => Promise<FsResult<{ action: string; output?: string }>>;
 };
 
 let bridge: FilesystemBridge | null = null;

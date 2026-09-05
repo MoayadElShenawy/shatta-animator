@@ -2,13 +2,21 @@
  * Path validation for the file capabilities.
  *
  * The model NEVER hands a raw OS path to the filesystem. Everything is
- * expressed as `scope:relative/path`, where `scope` is one of a few
- * user-owned folders the desktop shell agrees to expose. This module is pure:
- * it validates and normalises, it never touches a filesystem.
+ * expressed as `scope:relative/path`, where `scope` must be a scope the user
+ * has explicitly authorized (see `access.ts`). This module is pure: it
+ * validates and normalises, it never touches a filesystem.
  */
 
-export const FILE_SCOPES = ["desktop", "documents", "downloads"] as const;
-export type FileScope = (typeof FILE_SCOPES)[number];
+import {
+  DEFAULT_SCOPES,
+  DEVICE_SCOPE,
+  isScopeAuthorized,
+  isScopeToken,
+  type FileScope,
+} from "@/capabilities/access";
+
+export { DEFAULT_SCOPES, DEVICE_SCOPE };
+export type { FileScope };
 
 export const DEFAULT_SCOPE: FileScope = "documents";
 
@@ -17,6 +25,7 @@ export type FileLocation = { scope: FileScope; path: string };
 export type PathError =
   | "empty"
   | "unknown_scope"
+  | "unauthorized_scope"
   | "absolute_path"
   | "traversal"
   | "invalid_characters"
@@ -34,13 +43,26 @@ function fail(error: PathError, message: string): PathResult {
   return { ok: false, error, message };
 }
 
+/** True only for a scope the user has authorized in this session. */
 export function isFileScope(value: unknown): value is FileScope {
-  return typeof value === "string" && (FILE_SCOPES as readonly string[]).includes(value);
+  return isScopeAuthorized(value);
+}
+
+function checkScope(raw: unknown): { ok: true; scope: FileScope } | PathResult {
+  if (!isScopeToken(raw)) return fail("unknown_scope", `Unknown scope "${String(raw)}".`);
+  if (!isScopeAuthorized(raw)) {
+    return fail(
+      "unauthorized_scope",
+      `Scope "${raw}" is not authorized — the user has to grant access to it first.`,
+    );
+  }
+  return { ok: true, scope: raw };
 }
 
 /**
  * Accepts `"desktop:reports/q1.pdf"`, `"q1.pdf"` (falls back to `fallbackScope`)
- * or `{ scope, path }`. Rejects absolute paths, traversal and control chars.
+ * or `{ scope, path }`. Rejects absolute paths, traversal, control chars and
+ * any scope the user has not authorized.
  */
 export function parseLocation(input: unknown, fallbackScope: FileScope = DEFAULT_SCOPE): PathResult {
   let scopeRaw: string = fallbackScope;
@@ -49,25 +71,29 @@ export function parseLocation(input: unknown, fallbackScope: FileScope = DEFAULT
   if (input && typeof input === "object" && !Array.isArray(input)) {
     const obj = input as { scope?: unknown; path?: unknown };
     if (obj.scope !== undefined) {
-      if (!isFileScope(obj.scope)) return fail("unknown_scope", `Unknown scope "${String(obj.scope)}".`);
-      scopeRaw = obj.scope;
+      const checked = checkScope(obj.scope);
+      if (!("scope" in checked)) return checked;
+      scopeRaw = checked.scope;
     }
     if (typeof obj.path !== "string") return fail("empty", "No path supplied.");
     rest = obj.path;
   } else if (typeof input === "string") {
     const trimmed = input.trim();
-    const match = /^([A-Za-z_]+):(.*)$/.exec(trimmed);
-    if (match && isFileScope(match[1]!.toLowerCase())) {
-      scopeRaw = match[1]!.toLowerCase();
+    const match = /^([A-Za-z0-9_-]+):(.*)$/.exec(trimmed);
+    if (match && !/^[A-Za-z]$/.test(match[1]!)) {
+      const checked = checkScope(match[1]!.toLowerCase());
+      if (!("scope" in checked)) return checked;
+      scopeRaw = checked.scope;
       rest = match[2]!;
-    } else if (match && !/^[A-Za-z]$/.test(match[1]!)) {
-      return fail("unknown_scope", `Unknown scope "${match[1]}".`);
     } else {
       rest = trimmed;
     }
   } else {
     return fail("empty", "No path supplied.");
   }
+
+  const fallbackChecked = checkScope(scopeRaw);
+  if (!("scope" in fallbackChecked)) return fallbackChecked;
 
   const raw = rest.trim().replace(/\\/g, "/");
   if (!raw) return fail("empty", "No path supplied.");
