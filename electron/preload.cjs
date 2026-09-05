@@ -15,3 +15,16 @@ contextBridge.exposeInMainWorld("shatta", {
     return () => ipcRenderer.removeListener("pet:dev-update", handler);
   },
 });
+
+/**
+ * Scoped filesystem bridge. The renderer can ONLY name a scope
+ * ("desktop" | "documents" | "downloads") plus a relative path — the main
+ * process resolves it and refuses anything that escapes the scope root.
+ * No delete, no shell, no arbitrary absolute paths, no file contents.
+ */
+contextBridge.exposeInMainWorld("shattaFs", {
+  scopes: () => ipcRenderer.invoke("fs:scopes"),
+  search: (input) => ipcRenderer.invoke("fs:search", input),
+  copy: (input) => ipcRenderer.invoke("fs:copy", input),
+  move: (input) => ipcRenderer.invoke("fs:move", input),
+});
