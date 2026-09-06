@@ -2,14 +2,15 @@
  * Capability (tool) abstraction.
  *
  * A capability is something the pet *could* do beyond talking: search the web,
- * find a file, move a file. This module defines the boundary only — nothing
- * here touches the filesystem, the shell or the network.
+ * find a file, move a file, delete a file, run an allowlisted system action.
+ * This module defines the boundary only — nothing here touches the filesystem,
+ * the shell or the network.
  *
  * Safety model (enforced by the registry, not by the AI):
  *  - every capability declares a `risk` level and whether it needs confirmation
  *  - a capability must be enabled by settings AND allowed by the character
- *  - destructive / non-read-only capabilities can NEVER run without an explicit
- *    confirmation token supplied by the UI layer
+ *  - destructive capabilities can NEVER run without an explicitly approved
+ *    confirmation that is bound to the exact target of the operation
  */
 
 export type CapabilityId =
@@ -36,12 +37,26 @@ export type CapabilityStatus = "available" | "not_implemented" | "disabled";
 
 export type CapabilityInput = Record<string, unknown>;
 
+export type CapabilityFailureReason =
+  | "denied"
+  | "unconfirmed"
+  | "not_implemented"
+  | "not_supported"
+  | "rejected"
+  | "conflict"
+  | "failed";
+
 export type CapabilityResult =
   | { ok: true; data: unknown }
-  | { ok: false; error: string; reason: "denied" | "unconfirmed" | "not_implemented" | "failed" };
+  | { ok: false; error: string; reason: CapabilityFailureReason };
 
 export type CapabilityRunOptions = {
-  /** Present only when the user explicitly approved this exact invocation. */
+  /**
+   * Id of a confirmation the user explicitly approved. Required for
+   * destructive capabilities and for confirmation-gated system actions.
+   */
+  confirmationId?: string;
+  /** Legacy inline approval. Never accepted for destructive capabilities. */
   confirmation?: { approved: boolean; at: number };
   signal?: AbortSignal;
 };
@@ -52,6 +67,17 @@ export type Capability = {
   description: string;
   permissions: CapabilityPermissions;
   status: CapabilityStatus;
+  /**
+   * Stable key identifying the exact operation for a given input, so a
+   * confirmation can be bound to it. Returning null means "cannot be
+   * identified" and any confirmation-gated run is refused.
+   */
+  targetKey?: (input: CapabilityInput) => string | null;
+  /**
+   * True when this specific input needs confirmation even though the
+   * capability itself is not always destructive (system actions).
+   */
+  needsConfirmationFor?: (input: CapabilityInput) => boolean;
   /**
    * Executed only through `runCapability`. Foundation capabilities return
    * `not_implemented` — they exist so the surrounding architecture is testable.
@@ -72,4 +98,10 @@ export const notImplemented = (id: string): CapabilityResult => ({
   ok: false,
   reason: "not_implemented",
   error: `Capability "${id}" is declared but not implemented yet.`,
+});
+
+export const notSupported = (id: string, detail = ""): CapabilityResult => ({
+  ok: false,
+  reason: "not_supported",
+  error: `Capability "${id}" is not supported by this runtime.${detail ? ` ${detail}` : ""}`,
 });
