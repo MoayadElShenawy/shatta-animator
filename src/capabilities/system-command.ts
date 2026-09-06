@@ -59,6 +59,6 @@ export const systemCommandCapability: Capability = {
               : "failed";
       return { ok: false, reason, error: res.error };
     }
-    return { ok: true, data: { action: validated.action.id, label: validated.action.label, ...res.data } };
+    return { ok: true, data: { ...res.data, action: validated.action.id, label: validated.action.label } };
   },
 };
