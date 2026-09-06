@@ -4,9 +4,15 @@
  * `runCapability` is the ONLY way a capability may execute. It checks, in
  * order: registration -> character allow-list -> settings flag -> confirmation
  * -> implementation. Nothing can bypass this from the AI or the UI.
+ *
+ * Confirmation rules enforced here:
+ *  - destructive capabilities (and confirmation-gated system actions) require
+ *    an approved confirmation id that is bound to this exact target
+ *  - the model cannot fabricate approval: only the UI holds confirmation ids
  */
 
 import { fileCapabilities } from "@/capabilities/files";
+import { systemCommandCapability } from "@/capabilities/system-command";
 import { webSearchCapability } from "@/capabilities/web-search";
 import type {
   Capability,
@@ -16,6 +22,7 @@ import type {
   CapabilityResult,
   CapabilityRunOptions,
 } from "@/capabilities/types";
+import { isApproved } from "@/permissions/confirmations";
 
 const registry = new Map<CapabilityId, Capability>();
 
@@ -23,7 +30,7 @@ export function registerCapability(capability: Capability) {
   registry.set(capability.id, capability);
 }
 
-for (const capability of [webSearchCapability, ...fileCapabilities]) {
+for (const capability of [webSearchCapability, ...fileCapabilities, systemCommandCapability]) {
   registerCapability(capability);
 }
 
@@ -67,6 +74,13 @@ function isFlagOn(capability: Capability, gate: CapabilityGate): boolean {
   return gate.flags[flag];
 }
 
+/** Does this capability need confirmation for this specific input? */
+export function requiresConfirmationFor(capability: Capability, input: CapabilityInput): boolean {
+  if (capability.permissions.risk === "destructive") return true;
+  if (capability.permissions.requiresConfirmation) return true;
+  return capability.needsConfirmationFor?.(input) === true;
+}
+
 /** The enforcement gate. Never call `capability.run` directly. */
 export async function runCapability(
   id: CapabilityId,
@@ -84,16 +98,22 @@ export async function runCapability(
   if (!isFlagOn(capability, gate)) {
     return { ok: false, reason: "denied", error: `"${id}" is disabled in settings.` };
   }
-  const needsConfirmation =
-    capability.permissions.requiresConfirmation ||
-    capability.permissions.risk !== "read_only";
-  if (needsConfirmation && options.confirmation?.approved !== true) {
-    return {
-      ok: false,
-      reason: "unconfirmed",
-      error: `"${id}" requires explicit user confirmation before it can run.`,
-    };
+
+  if (requiresConfirmationFor(capability, input)) {
+    const target = capability.targetKey ? capability.targetKey(input) : null;
+    const bound = isApproved(options.confirmationId, id, Date.now(), target);
+    // Inline approval is only ever accepted for non-destructive capabilities.
+    const inline =
+      capability.permissions.risk !== "destructive" && options.confirmation?.approved === true;
+    if (!bound && !inline) {
+      return {
+        ok: false,
+        reason: "unconfirmed",
+        error: `"${id}" requires explicit user confirmation of this exact operation before it can run.`,
+      };
+    }
   }
+
   if (capability.status !== "available") {
     return {
       ok: false,

@@ -4,7 +4,8 @@
  * Confirmations are ephemeral by design: they live in a module-level Map, are
  * never persisted (no localStorage, no database, no network) and expire.
  * Approval must be explicit and must reference a specific pending id — a vague
- * "okay" in chat can never approve anything.
+ * "okay" in chat can never approve anything. When a confirmation carries a
+ * `target`, approval only counts for that exact target.
  */
 
 import type { CapabilityId } from "@/capabilities/types";
@@ -18,6 +19,10 @@ export type PendingConfirmation = {
   capability: CapabilityId;
   /** Human-readable description of exactly what will happen if approved. */
   description: string;
+  /** Stable key of the exact operation (e.g. "desktop:file.pdf"), if known. */
+  target?: string;
+  /** True when the operation cannot be undone. Drives the UI warning. */
+  destructive?: boolean;
   /** Metadata about the request (paths, query…). Never executed by this layer. */
   metadata: Record<string, unknown>;
   createdAt: number;
@@ -36,6 +41,8 @@ function nextId(): string {
 export function requestConfirmation(input: {
   capability: CapabilityId;
   description: string;
+  target?: string | null;
+  destructive?: boolean;
   metadata?: Record<string, unknown>;
   ttlMs?: number;
   now?: number;
@@ -45,6 +52,8 @@ export function requestConfirmation(input: {
     id: nextId(),
     capability: input.capability,
     description: input.description,
+    ...(input.target ? { target: input.target } : {}),
+    ...(input.destructive !== undefined ? { destructive: input.destructive } : {}),
     metadata: input.metadata ?? {},
     createdAt: now,
     expiresAt: now + (input.ttlMs ?? CONFIRMATION_TTL_MS),
@@ -81,15 +90,23 @@ export function denyConfirmation(id: string, now = Date.now()): PendingConfirmat
   return record;
 }
 
-/** True only for an explicitly approved, non-expired confirmation of that capability. */
+/**
+ * True only for an explicitly approved, non-expired confirmation of that
+ * capability. When the confirmation was bound to a target, the caller must
+ * present the same target — a confirmation for one file can never authorize
+ * an operation on another.
+ */
 export function isApproved(
   id: string | undefined,
   capability: CapabilityId,
   now = Date.now(),
+  target?: string | null,
 ): boolean {
   if (!id) return false;
   const record = getConfirmation(id, now);
-  return !!record && record.status === "approved" && record.capability === capability;
+  if (!record || record.status !== "approved" || record.capability !== capability) return false;
+  if (record.target !== undefined) return !!target && record.target === target;
+  return true;
 }
 
 export function listConfirmations(now = Date.now()): readonly PendingConfirmation[] {

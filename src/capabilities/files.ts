@@ -186,7 +186,7 @@ export const fileDeleteCapability: Capability = {
     }
     const res = await bridge.remove({ target: parsed.location });
     if (!res.ok) return failed(res.reason, res.error);
-    return { ok: true, data: { operation: "file_delete", target: parsed.location, ...res.data } };
+    return { ok: true, data: { ...res.data, operation: "file_delete", target: parsed.location } };
   },
 };
 
