@@ -59,6 +59,14 @@ const RULES: readonly Rule[] = [
 
 const FILE_NAME = /([\w.-]+\.(pdf|docx?|xlsx?|pptx?|txt|png|jpe?g|gif|zip|mp[34]|csv|json))/i;
 
+/** Which default folder the user named, if any. Never a raw OS path. */
+function scopeHint(text: string): string | null {
+  if (/\bdesktop\b/i.test(text) || /الديسك?توب|سطح المكتب/.test(text)) return "desktop";
+  if (/\bdocuments?\b/i.test(text) || /المستندات|الدوكيومنت/.test(text)) return "documents";
+  if (/\bdownloads?\b/i.test(text) || /التنزيلات|الداونلود/.test(text)) return "downloads";
+  return null;
+}
+
 export function routeCapability(message: string): CapabilityIntent {
   const text = (message ?? "").trim();
   if (!text) return { capability: null, confidence: 0, metadata: {} };
