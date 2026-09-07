@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import type { PetSettings } from "@/hooks/usePetSettings";
+import { FileAccessSettings } from "@/components/pet/FileAccessSettings";
 
 type Toggle = { key: keyof PetSettings; label: string; hint: string };
 
@@ -87,6 +88,10 @@ export function SettingsPanel({
             className="mt-2 w-full accent-[var(--color-primary)]"
           />
         </div>
+      </div>
+
+      <div className="border-t border-border px-4 py-3">
+        <FileAccessSettings enabled={settings.fileOperations} />
       </div>
 
       <footer className="border-t border-border p-2">
