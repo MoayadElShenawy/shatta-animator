@@ -5,7 +5,7 @@
  * anything: execution stays behind `runCapability` in the capability registry.
  */
 
-import type { CapabilityId, CapabilityRisk } from "@/capabilities/types";
+import type { CapabilityId, CapabilityInput, CapabilityRisk } from "@/capabilities/types";
 import type { CapabilityGate } from "@/capabilities/registry";
 
 export type PermissionOutcome = "allowed" | "needs_confirmation" | "unavailable";
@@ -33,6 +33,8 @@ export type PermissionDecision = {
 export type PermissionRequest = {
   capability: CapabilityId;
   gate: CapabilityGate;
+  /** The concrete input, so per-operation rules (targets, actions) apply. */
+  input?: CapabilityInput;
   /** A confirmation token id previously approved by the user, if any. */
   confirmationId?: string;
 };

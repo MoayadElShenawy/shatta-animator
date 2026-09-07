@@ -7,7 +7,7 @@
  * through `runCapability`, which re-checks the same rules.
  */
 
-import { getCapability, type CapabilityGate } from "@/capabilities/registry";
+import { getCapability, requiresConfirmationFor, type CapabilityGate } from "@/capabilities/registry";
 import type { CapabilityId } from "@/capabilities/types";
 import { isApproved } from "@/permissions/confirmations";
 import type { PermissionDecision, PermissionRequest } from "@/permissions/types";
@@ -22,7 +22,8 @@ export const PERMISSION_RULES: Record<
   file_copy: { readOnly: false, destructive: false, requiresConfirmation: false },
   file_move: { readOnly: false, destructive: false, requiresConfirmation: false },
   file_delete: { readOnly: false, destructive: true, requiresConfirmation: true },
-  system_command: { readOnly: false, destructive: true, requiresConfirmation: true },
+  // Policy-controlled: risk and confirmation depend on the requested action.
+  system_command: { readOnly: false, destructive: false, requiresConfirmation: false },
 };
 
 function isFlagOn(flag: string, gate: CapabilityGate): boolean {
@@ -32,6 +33,7 @@ function isFlagOn(flag: string, gate: CapabilityGate): boolean {
 
 export function checkPermission(request: PermissionRequest): PermissionDecision {
   const { capability: id, gate } = request;
+  const input = request.input ?? {};
   const rule = PERMISSION_RULES[id];
   const capability = getCapability(id);
 
@@ -69,11 +71,15 @@ export function checkPermission(request: PermissionRequest): PermissionDecision 
     };
   }
 
-  const needsConfirmation =
-    rule.requiresConfirmation || capability.permissions.requiresConfirmation;
-  if (needsConfirmation && !isApproved(request.confirmationId, id)) {
+  // Per-input requirement: covers destructive capabilities and the
+  // high-impact subset of the allowlisted system actions.
+  const needsConfirmation = rule.requiresConfirmation || requiresConfirmationFor(capability, input);
+  const target = capability.targetKey ? capability.targetKey(input) : null;
+  const decision = { ...base, requiresConfirmation: needsConfirmation };
+
+  if (needsConfirmation && !isApproved(request.confirmationId, id, Date.now(), target)) {
     return {
-      ...base,
+      ...decision,
       outcome: "needs_confirmation",
       reason: "requires_confirmation",
       message: `"${id}" needs explicit confirmation from the user first.`,
@@ -82,12 +88,12 @@ export function checkPermission(request: PermissionRequest): PermissionDecision 
 
   if (capability.status !== "available") {
     return {
-      ...base,
+      ...decision,
       outcome: "unavailable",
       reason: "not_implemented",
       message: `"${id}" is declared but not implemented yet.`,
     };
   }
 
-  return { ...base, outcome: "allowed", reason: "ok", message: `"${id}" may run.` };
+  return { ...decision, outcome: "allowed", reason: "ok", message: `"${id}" may run.` };
 }
