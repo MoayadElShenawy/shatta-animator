@@ -341,6 +341,9 @@ export function Shatta({
               onSend={chat.send}
               onClear={chat.clear}
               onClose={closePanel}
+              confirmation={chat.confirmation}
+              onApprove={() => void chat.approve()}
+              onDecline={chat.decline}
               mic={{
                 status: mic.status,
                 supported: mic.supported && settings.voiceInput,

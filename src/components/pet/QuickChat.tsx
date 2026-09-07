@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Mic, Send, Square, Trash2, X } from "lucide-react";
-import type { ChatMessage } from "@/hooks/useShattaChat";
+import type { ChatConfirmation, ChatMessage } from "@/hooks/useShattaChat";
 import type { MicStatus } from "@/hooks/useVoiceInput";
 
 /** Compact "Ask Shatta anything..." composer + transcript. */
@@ -11,6 +11,9 @@ export function QuickChat({
   onSend,
   onClear,
   onClose,
+  confirmation,
+  onApprove,
+  onDecline,
   mic,
 }: {
   messages: ChatMessage[];
@@ -19,6 +22,9 @@ export function QuickChat({
   onSend: (text: string) => void;
   onClear: () => void;
   onClose: () => void;
+  confirmation?: ChatConfirmation | null;
+  onApprove?: () => void;
+  onDecline?: () => void;
   mic: {
     status: MicStatus;
     supported: boolean;
@@ -95,6 +101,36 @@ export function QuickChat({
 
       {error || mic.error ? (
         <p className="px-4 pb-2 text-xs text-destructive">{error ?? mic.error}</p>
+      ) : null}
+
+      {confirmation ? (
+        <div className="mx-3 mb-2 rounded-2xl border-2 border-destructive/50 bg-destructive/10 px-3 py-2" dir="rtl">
+          <p className="text-sm font-semibold text-destructive">
+            {confirmation.destructive ? "⚠️ " : ""}
+            {confirmation.destructive ? "دي حركة مش بترجع تاني" : "محتاجة موافقتك"}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-foreground">
+            {confirmation.capability === "file_delete"
+              ? `أنت متأكد من حذف ${confirmation.target ?? "الملف"}؟`
+              : `أنت متأكد من: ${confirmation.description}؟`}
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={onApprove}
+              className="rounded-full bg-destructive px-4 py-1.5 text-xs font-bold text-destructive-foreground"
+            >
+              نعم
+            </button>
+            <button
+              type="button"
+              onClick={onDecline}
+              className="rounded-full border border-border px-4 py-1.5 text-xs font-medium text-muted-foreground"
+            >
+              لا
+            </button>
+          </div>
+        </div>
       ) : null}
 
       <form onSubmit={submit} className="flex items-center gap-2 border-t border-border p-2">
