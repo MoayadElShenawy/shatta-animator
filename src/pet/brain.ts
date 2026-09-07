@@ -12,7 +12,13 @@
 
 import { askShatta } from "@/ai";
 import type { AiMessage, AiResponse } from "@/ai/types";
-import { describeCapabilities, runCapability, type CapabilityGate } from "@/capabilities/registry";
+import {
+  describeCapabilities,
+  getCapability,
+  requiresConfirmationFor,
+  runCapability,
+  type CapabilityGate,
+} from "@/capabilities/registry";
 import { describeIntent, routeCapability, type CapabilityIntent } from "@/capabilities/routing";
 import type { CapabilityDescriptor, CapabilityResult } from "@/capabilities/types";
 import { getActiveCharacter } from "@/characters/registry";
@@ -37,6 +43,8 @@ export type BrainRequest = {
   /** Prior turns, WITHOUT the message being sent. */
   history?: readonly AiMessage[];
   flags?: Partial<BrainFlags>;
+  /** Id of a confirmation the user explicitly approved in the UI. */
+  confirmationId?: string;
   onChunk?: (chunk: string) => void;
   signal?: AbortSignal;
   character?: CharacterDefinition;
@@ -114,13 +122,22 @@ export function decideTurn(request: BrainRequest): BrainDecision {
     allowed: character.capabilities?.allowedCapabilities ?? [],
     flags,
   };
-  const permission = checkPermission({ capability: intent.capability, gate });
+  const permission = checkPermission({
+    capability: intent.capability,
+    gate,
+    input: intent.metadata,
+    ...(request.confirmationId ? { confirmationId: request.confirmationId } : {}),
+  });
 
   let confirmation: PendingConfirmation | null = null;
   if (permission.outcome === "needs_confirmation") {
+    const capability = getCapability(intent.capability);
+    const target = capability?.targetKey ? capability.targetKey(intent.metadata) : null;
     confirmation = requestConfirmation({
       capability: intent.capability,
       description: describeIntent(intent),
+      target,
+      destructive: permission.destructive || capability?.permissions.risk === "destructive",
       metadata: intent.metadata,
     });
   }
@@ -147,6 +164,7 @@ export async function executeDecision(
   };
   const runOptions: Parameters<typeof runCapability>[3] = {};
   if (request.signal) runOptions.signal = request.signal;
+  if (request.confirmationId) runOptions.confirmationId = request.confirmationId;
   return runCapability(
     decision.intent.capability,
     decision.intent.metadata,
@@ -156,3 +174,14 @@ export async function executeDecision(
 }
 
 
+
+/**
+ * Does this decision need the user to confirm before anything happens?
+ * Pure helper for the UI — it never approves anything itself.
+ */
+export function decisionNeedsConfirmation(decision: BrainDecision): boolean {
+  if (decision.route !== "capability" || !decision.intent.capability) return false;
+  const capability = getCapability(decision.intent.capability);
+  if (!capability) return false;
+  return requiresConfirmationFor(capability, decision.intent.metadata);
+}
