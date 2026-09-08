@@ -27,4 +27,10 @@ contextBridge.exposeInMainWorld("shattaFs", {
   search: (input) => ipcRenderer.invoke("fs:search", input),
   copy: (input) => ipcRenderer.invoke("fs:copy", input),
   move: (input) => ipcRenderer.invoke("fs:move", input),
+  remove: (input) => ipcRenderer.invoke("fs:remove", input),
+  grants: () => ipcRenderer.invoke("fs:grants"),
+  requestFolderAccess: () => ipcRenderer.invoke("fs:requestFolder"),
+  requestDeviceAccess: () => ipcRenderer.invoke("fs:requestDevice"),
+  revokeAllAccess: () => ipcRenderer.invoke("fs:revokeAll"),
+  runCommand: (input) => ipcRenderer.invoke("fs:command", input),
 });
